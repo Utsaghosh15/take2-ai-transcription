@@ -22,6 +22,8 @@ const FileAudioIcon = () => (
   </svg>
 );
 
+const apiBase = process.env.REACT_APP_API_URL || '';
+
 function App() {
   const [segments, setSegments] = useState([]);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -37,19 +39,24 @@ function App() {
       const formData = new FormData();
       formData.append('audio', file);
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch(apiBase + '/api/upload', {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+        const text = await response.text();
+        let errorMessage = 'Upload failed';
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch (_) {}
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setSegments(data.segments);
-      setAudioUrl(data.audioUrl);
+      setAudioUrl(data.audioUrl?.startsWith('http') ? data.audioUrl : apiBase + data.audioUrl);
       setTranscriptId(data.transcriptId);
     } catch (err) {
       setError(err.message);
@@ -68,7 +75,7 @@ function App() {
     // Save to backend
     if (transcriptId) {
       try {
-        await fetch(`/api/transcript/${transcriptId}`, {
+        await fetch(apiBase + `/api/transcript/${transcriptId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ segments: updatedSegments })
